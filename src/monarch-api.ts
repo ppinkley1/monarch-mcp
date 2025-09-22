@@ -11,8 +11,10 @@ export interface Account {
   id: string;
   displayName: string;
   currentBalance: number;
+  includeInNetWorth: boolean;
   type: {
     name: string;
+    group: string;
   };
   institution?: {
     name: string;
@@ -158,8 +160,9 @@ export class MonarchMoneyAPI {
             order
             logoUrl
             type {
-              name
               display
+              group
+              name
               __typename
             }
             subtype {
@@ -257,7 +260,7 @@ export class MonarchMoneyAPI {
       offset,
       limit,
       filters: {},
-      orderBy: "date"
+      orderBy: 'date',
     };
 
     if (accountId) variables.filters.accountId = accountId;
@@ -307,21 +310,32 @@ export class MonarchMoneyAPI {
     `;
 
     const now = new Date();
-    const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    const startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+      .toISOString()
+      .split('T')[0];
+    const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      .toISOString()
+      .split('T')[0];
 
     try {
-      const data: any = await this.graphQLClient.request(query, { startDate, endDate });
+      const data: any = await this.graphQLClient.request(query, {
+        startDate,
+        endDate,
+      });
       const categoryData = data.budgetData?.monthlyAmountsByCategory || [];
 
       return categoryData.map((catData: any) => {
-        const currentMonth = catData.monthlyAmounts?.find((ma: any) => ma.month === startDate.substring(0, 7));
+        const currentMonth = catData.monthlyAmounts?.find(
+          (ma: any) => ma.month === startDate.substring(0, 7)
+        );
         return {
           id: catData.category?.id,
           name: catData.category?.name,
           amount: currentMonth?.plannedAmount || 0,
           spent: currentMonth?.actualAmount || 0,
-          remaining: (currentMonth?.plannedAmount || 0) - (currentMonth?.actualAmount || 0),
+          remaining:
+            (currentMonth?.plannedAmount || 0) -
+            (currentMonth?.actualAmount || 0),
         };
       });
     } catch (error: any) {

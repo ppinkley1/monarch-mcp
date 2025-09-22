@@ -421,27 +421,21 @@ export class MonarchTools {
       const liabilityAccounts: any[] = [];
 
       accounts?.forEach((account: Account) => {
-        const balance = account.currentBalance || 0;
-        const accountType = account.type?.name?.toLowerCase() || '';
+        if (!account.includeInNetWorth) {
+          return; // Skip accounts not included in net worth
+        }
 
-        if (
-          [
-            'checking',
-            'savings',
-            'investment',
-            'retirement',
-            'brokerage',
-          ].includes(accountType)
-        ) {
+        const balance = account.currentBalance || 0;
+        const accountGroup = account.type?.group?.toLowerCase() || '';
+
+        if (accountGroup === 'asset') {
           totalAssets += balance;
           assetAccounts.push({
             name: account.displayName,
             type: account.type?.name,
             balance: balance,
           });
-        } else if (
-          ['credit', 'loan', 'mortgage', 'liability'].includes(accountType)
-        ) {
+        } else if (accountGroup === 'liability') {
           totalLiabilities += Math.abs(balance);
           liabilityAccounts.push({
             name: account.displayName,
