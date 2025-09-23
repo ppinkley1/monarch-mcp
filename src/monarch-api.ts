@@ -9,14 +9,21 @@ export interface LoginResponse {
 
 export interface Account {
   id: string;
+  mask: string | null;
   displayName: string;
   currentBalance: number;
   includeInNetWorth: boolean;
   type: {
     name: string;
     group: string;
+    display: string;
+  };
+  subtype: {
+    name: string;
+    display: string;
   };
   institution?: {
+    id: string;
     name: string;
   };
 }
@@ -50,6 +57,67 @@ export interface Budget {
   remaining: number;
 }
 
+interface Portfolio {
+  performance: {
+    totalValue: number;
+    totalBasis: number;
+    totalChangePercent: number;
+    totalChangeDollars: number;
+    oneDayChangePercent: number;
+    historicalChart: {
+      date: string;
+      returnPercent: number;
+    }[];
+    benchmarks: {
+      security: {
+        id: string;
+        ticker: string;
+        name: string;
+        oneDayChangePercent: number;
+      };
+      historicalChart: {
+        date: string;
+        returnPercent: number;
+      }[];
+    }[];
+  };
+  aggregateHoldings: {
+    edges: {
+      node: {
+        id: string;
+        quantity: number;
+        basis: number;
+        totalValue: number;
+        securityPriceChangeDollars: number | null;
+        securityPriceChangePercent: number | null;
+        lastSyncedAt: string | null;
+        holdings: {
+          id: string;
+          type: string;
+          typeDisplay: string;
+          name: string;
+          ticker: string | null;
+          closingPrice: number | null;
+          closingPriceUpdatedAt: string | null;
+          quantity: number;
+          value: number;
+          account: Account;
+        }[];
+        security: {
+          id: string;
+          name: string;
+          ticker: string | null;
+          currentPrice: number | null;
+          currentPriceUpdatedAt: string | null;
+          closingPrice: number | null;
+          type: string;
+          typeDisplay: string;
+        };
+      };
+    }[];
+  };
+}
+
 export class MonarchMoneyAPI {
   private static baseURL = 'https://api.monarchmoney.com';
   private graphQLClient: GraphQLClient;
@@ -72,14 +140,6 @@ export class MonarchMoneyAPI {
         },
       }
     );
-  }
-
-  private ensureAuthenticated(): void {
-    if (!this.token || !this.graphQLClient) {
-      throw new Error(
-        'Authentication failed. Please check your MONARCH_TOKEN environment variable.'
-      );
-    }
   }
 
   static async login(
@@ -118,8 +178,6 @@ export class MonarchMoneyAPI {
   }
 
   async getAccounts(): Promise<Account[]> {
-    this.ensureAuthenticated();
-
     const query = `
           query GetAccounts {
             accounts {
@@ -220,8 +278,6 @@ export class MonarchMoneyAPI {
       offset?: number;
     } = {}
   ): Promise<Transaction[]> {
-    this.ensureAuthenticated();
-
     const { limit = 100, accountId, startDate, endDate, offset = 0 } = options;
 
     const query = `
@@ -284,8 +340,6 @@ export class MonarchMoneyAPI {
   }
 
   async getBudgets(): Promise<Budget[]> {
-    this.ensureAuthenticated();
-
     const query = `
       query Common_GetJointPlanningData($startDate: Date!, $endDate: Date!) {
         budgetSystem
@@ -352,8 +406,6 @@ export class MonarchMoneyAPI {
   }
 
   async getCategories(): Promise<any[]> {
-    this.ensureAuthenticated();
-
     const query = `
       query GetCategories {
         categories {
@@ -389,8 +441,6 @@ export class MonarchMoneyAPI {
     startDate?: string,
     endDate?: string
   ): Promise<any[]> {
-    this.ensureAuthenticated();
-
     let filters = `accountId: "${accountId}"`;
     if (startDate) {
       filters += `, startDate: "${startDate}"`;
@@ -425,7 +475,121 @@ export class MonarchMoneyAPI {
     }
   }
 
-  isAuthenticated(): boolean {
-    return !!(this.token && this.graphQLClient);
+  async getPortfolio(startDate?: string, endDate?: string): Promise<Portfolio> {
+    const query = `
+      query GetPortfolio($portfolioInput: PortfolioInput) {
+        portfolio(input: $portfolioInput) {
+          performance {
+            totalValue
+            totalBasis
+            totalChangePercent
+            totalChangeDollars
+            oneDayChangePercent
+            historicalChart {
+              date
+              returnPercent
+              __typename
+            }
+            benchmarks {
+              security {
+                id
+                ticker
+                name
+                oneDayChangePercent
+                __typename
+              }
+              historicalChart {
+                date
+                returnPercent
+                __typename
+              }
+              __typename
+            }
+            __typename
+          }
+          aggregateHoldings {
+            edges {
+              node {
+                id
+                quantity
+                basis
+                totalValue
+                securityPriceChangeDollars
+                securityPriceChangePercent
+                lastSyncedAt
+                holdings {
+                  id
+                  type
+                  typeDisplay
+                  name
+                  ticker
+                  closingPrice
+                  closingPriceUpdatedAt
+                  quantity
+                  value
+                  account {
+                    id
+                    mask
+                    icon
+                    logoUrl
+                    institution {
+                      id
+                      name
+                      __typename
+                    }
+                    type {
+                      name
+                      display
+                      __typename
+                    }
+                    subtype {
+                      name
+                      display
+                      __typename
+                    }
+                    displayName
+                    currentBalance
+                    __typename
+                  }
+                  __typename
+                }
+                security {
+                  id
+                  name
+                  ticker
+                  currentPrice
+                  currentPriceUpdatedAt
+                  closingPrice
+                  type
+                  typeDisplay
+                  __typename
+                }
+                __typename
+              }
+              __typename
+            }
+            __typename
+          }
+          __typename
+        }
+      }
+    `;
+
+    try {
+      const data: any = await this.graphQLClient.request(query, {
+        portfolioInput: { startDate, endDate },
+      });
+      return data.portfolio;
+    } catch (error: any) {
+      if (
+        error.message.includes('401') ||
+        error.message.includes('unauthorized')
+      ) {
+        throw new Error(
+          'Authentication failed. Please check your MONARCH_TOKEN environment variable.'
+        );
+      }
+      throw new Error(`Failed to get portfolio: ${error.message}`);
+    }
   }
 }

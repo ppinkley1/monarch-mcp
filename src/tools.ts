@@ -179,6 +179,25 @@ export class MonarchTools {
           required: ['accountId'],
         },
       },
+      {
+        name: 'get_portfolio',
+        description:
+          'Get current investment portfolio summary, including holdings and performance',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            startDate: {
+              type: 'string',
+              description: 'Start date in YYYY-MM-DD format',
+            },
+            endDate: {
+              type: 'string',
+              description: 'End date in YYYY-MM-DD format',
+            },
+          },
+          required: [],
+        },
+      },
     ];
   }
 
@@ -217,6 +236,9 @@ export class MonarchTools {
           args.startDate,
           args.endDate
         );
+
+      case 'get_portfolio':
+        return await this.getPortfolio(args.startDate, args.endDate);
 
       default:
         throw new Error(`Unknown tool: ${name}`);
@@ -567,6 +589,29 @@ export class MonarchTools {
     } catch (error) {
       throw new Error(
         `Failed to get account snapshots: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      );
+    }
+  }
+
+  private async getPortfolio(
+    startDate?: string,
+    endDate?: string
+  ): Promise<any> {
+    try {
+      const portfolio = await this.api.getPortfolio(startDate, endDate);
+
+      return {
+        success: true,
+        data: portfolio,
+        summary: `Retrieved portfolio summary with ${
+          portfolio?.aggregateHoldings?.edges?.length || 0
+        } holdings`,
+      };
+    } catch (error) {
+      throw new Error(
+        `Failed to get portfolio: ${
           error instanceof Error ? error.message : 'Unknown error'
         }`
       );
