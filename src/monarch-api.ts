@@ -119,7 +119,7 @@ interface Portfolio {
 }
 
 export class MonarchMoneyAPI {
-  private static baseURL = 'https://api.monarchmoney.com';
+  private static baseURL = 'https://api.monarch.com';
   private graphQLClient: GraphQLClient;
   private token: string;
 
